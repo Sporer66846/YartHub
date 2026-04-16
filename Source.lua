@@ -1,22 +1,18 @@
---[[ 
-    Yart Hub - Multi-Game Template
-    Powered by Starlight Interface Suite 
---]]
-
 --// SECTION : Booting Libraries
 local Starlight = loadstring(game:HttpGet("https://raw.nebulasoftworks.xyz/starlight"))()
 local NebulaIcons = loadstring(game:HttpGet("https://raw.nebulasoftworks.xyz/nebula-icon-library-loader"))()
 
 --// SECTION : Window Initialization
+-- The CreateWindow method sets up the main interface and loading screen.
 local win = Starlight:CreateWindow({
     Name = "Yart Hub",
     Subtitle = "Premium Script Hub",
-    Icon = 101065953742739, -- Your working Asset ID
+    Icon = 101065953742739, -- Verified working Asset ID
     
     LoadingEnabled = true,
     LoadingSettings = {
         Title = "Yart Hub",
-        Subtitle = "Detecting Game Environment...",
+        Subtitle = "Preparing Finished Assets...",
     },
     
     BuildWarnings = false,
@@ -30,38 +26,38 @@ local win = Starlight:CreateWindow({
 })
 
 --// SECTION : Home Tab Setup
+-- The Home Tab displays the executor compatibility and the latest changelog entry.
 win:CreateHomeTab({
-    DiscordInvite = "euUwQzXNmC", 
+    DiscordInvite = "yarthub", 
     IconStyle = 1,
-    SupportedExecutors = {"Volt", "Potassium", "Wave", "Seliware"}, -- Your requested list
+    SupportedExecutors = {"Volt", "Potassium", "Wave", "Seliware"}, 
     Changelog = {
         {
-            Title = "v1.2.0 - TSB Support",
-            Date = "April 2026",
-            Description = "Added full support for The Strongest Battlegrounds."
+            Title = "Release", 
+            Date = "Pending",
+            Description = "The script is currently in development. All features will be finalized upon official release."
         }
     }
 })
 
---// SECTION : Multi-Game Router
--- Place your PlaceIds here for easy management
+--// SECTION : Game Identification
 local Games = {
     TSB = 10449761463
 }
 
--- Current Place Detection
-local currentPlaceId = game.PlaceId
-
---// SUBSECTION : The Strongest Battlegrounds Logic
-if currentPlaceId == Games.TSB then
+--// SECTION : The Strongest Battlegrounds Features
+if game.PlaceId == Games.TSB then
+    -- CreateTabSection organizes the navigation sidebar.
     local tsbSection = win:CreateTabSection("TSB FEATURES")
     
+    -- CreateTab defines the individual page structure.
     local combatTab = tsbSection:CreateTab({
         Name = "Combat",
         Columns = 2,
         Icon = NebulaIcons:GetIcon("swords", "Lucide")
     }, "tsb_combat")
 
+    -- Groupboxes hold individual elements like toggles and sliders.
     local mainGroup = combatTab:CreateGroupbox({
         Name = "Automation",
         Column = 1,
@@ -71,37 +67,19 @@ if currentPlaceId == Games.TSB then
     mainGroup:CreateToggle({
         Name = "Auto Skills",
         CurrentValue = false,
-        Tooltip = "Automatically uses skills when they are off cooldown.",
         Callback = function(state)
-            -- Your TSB Skill Logic here
-            print("Auto Skills:", state)
+            print("Auto Skills active:", state)
         end
     }, "auto_skills")
 
-    local miscGroup = combatTab:CreateGroupbox({
-        Name = "Movement",
-        Column = 2
-    }, "tsb_move")
-
-    miscGroup:CreateSlider({
-        Name = "Infinite Dash Distance",
-        Range = {1, 50},
-        CurrentValue = 25,
-        Increment = 1,
-        Callback = function(val)
-            -- Your TSB Dash Logic here
-            print("Dash Distance:", val)
-        end
-    }, "dash_slider")
-
---// SUBSECTION : Future Games (Placeholder)
--- elseif currentPlaceId == 123456789 then
---    -- Setup for the next game goes here
-
---// SUBSECTION : Universal (Fallback for unsupported games)
+--// SECTION : Universal Features (Fallback)
 else
     local uniSection = win:CreateTabSection("UNIVERSAL")
-    local uniTab = uniSection:CreateTab({Name = "General", Icon = NebulaIcons:GetIcon("globe", "Lucide")})
+    local uniTab = uniSection:CreateTab({
+        Name = "General", 
+        Icon = NebulaIcons:GetIcon("globe", "Lucide")
+    })
+    
     local uniGroup = uniTab:CreateGroupbox({Name = "Movement"})
     
     uniGroup:CreateSlider({
@@ -114,7 +92,8 @@ else
     }, "uni_ws")
 end
 
---// SECTION : Core Settings (Always Visible)
+--// SECTION : Settings and Customization
+-- Starlight includes prebuilt methods for managing themes and configurations.
 local settingsSection = win:CreateTabSection("INTERFACE")
 local settingsTab = settingsSection:CreateTab({
     Name = "Settings", 
@@ -124,6 +103,6 @@ local settingsTab = settingsSection:CreateTab({
 settingsTab:BuildThemeGroupbox(1)
 settingsTab:BuildConfigGroupbox(2)
 
---// SECTION : Finalize
+-- Finalize by loading any saved user preferences.
 Starlight:LoadAutoloadConfig()
 Starlight:LoadAutoloadTheme()
