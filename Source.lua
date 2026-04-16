@@ -22,7 +22,7 @@ local win = Starlight:CreateWindow({
 
 --// SECTION : Home Tab
 win:CreateHomeTab({
-    DiscordInvite = "yarthub", 
+    DiscordInvite = "euUwQzXNmC", 
     SupportedExecutors = {"Volt", "Potassium", "Wave", "Seliware"},
     Changelog = {
         {
