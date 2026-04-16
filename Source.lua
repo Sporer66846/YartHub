@@ -6,7 +6,7 @@ local NebulaIcons = loadstring(game:HttpGet("https://raw.nebulasoftworks.xyz/neb
 local win = Starlight:CreateWindow({
     Name = "Yart Hub",
     Subtitle = "Premium Script Hub",
-    Icon = 100936220757270, -- Your specific asset ID
+    Icon = 101065953742739, -- Your specific asset ID
     
     LoadingEnabled = true,
     LoadingSettings = {
