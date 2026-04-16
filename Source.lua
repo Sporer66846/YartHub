@@ -37,14 +37,13 @@ local Aimbot = {
     BulletVelocity = 1000,
     BulletDrop = 0,
     FOV = 100,
-    Keybind = "E" -- Fixed: Starlight Keybinds require valid KeyCodes
+    Keybind = "E" -- Safe default keyboard key to prevent Starlight parsing crashes
 }
 
 local Triggerbot = { Enabled = false, Delay = 0.05 }
 
 local Visuals = {
-    Enabled = false,
-    Type = "Highlight", 
+    Enabled = false, -- Box ESP is the default and only mode when true
     Names = false,
     Distance = false,
     HealthBar = false,
@@ -55,7 +54,8 @@ local Visuals = {
 local Movement = {
     WSEnabled = false, WSValue = 16,
     JPEnabled = false, JPValue = 50,
-    TPWalk = false, TPSpeed = 50
+    TPWalk = false, TPSpeed = 50,
+    ClickTP = false
 }
 
 --// SECTION: Utility Functions
@@ -79,16 +79,15 @@ local function GetClosestPlayer()
 end
 
 local function HideCache(cache)
-    cache.Highlight.Adornee = nil
     cache.Box.Visible = false
     cache.HealthBarBg.Visible = false
     cache.HealthBar.Visible = false
-    cache.Spine.Visible = false
     cache.Text.Visible = false
 end
 
---// SECTION: ESP Engine
+--// SECTION: ESP & FOV Engine
 RunService.RenderStepped:Connect(function()
+    -- FOV Circle Logic
     if Aimbot.ShowFOV then
         FOVCircle.Visible = true
         FOVCircle.Radius = Aimbot.FOV
@@ -100,18 +99,16 @@ RunService.RenderStepped:Connect(function()
 
     local rainbowColor = Color3.fromHSV(tick() % 5 / 5, 1, 1)
 
+    -- ESP Logic
     for _, v in pairs(Players:GetPlayers()) do
         if v ~= Player then
             if not ESP_Cache[v] then
                 ESP_Cache[v] = {
-                    Highlight = Instance.new("Highlight"),
                     Box = Drawing.new("Square"),
                     HealthBarBg = Drawing.new("Line"),
                     HealthBar = Drawing.new("Line"),
-                    Spine = Drawing.new("Line"),
                     Text = Drawing.new("Text")
                 }
-                ESP_Cache[v].Highlight.Parent = espFolder
                 ESP_Cache[v].Box.Thickness = 1
                 ESP_Cache[v].Box.Filled = false
                 ESP_Cache[v].HealthBarBg.Thickness = 3
@@ -142,51 +139,40 @@ RunService.RenderStepped:Connect(function()
                 if Visuals.Rainbow then useColor = rainbowColor
                 elseif Visuals.TeamColor and v.Team then useColor = v.TeamColor.Color end
 
-                HideCache(cache)
-
                 if onScreen then
-                    if Visuals.Type == "Highlight" then
-                        cache.Highlight.Adornee = char
-                        cache.Highlight.FillColor = useColor
-                        cache.Highlight.FillTransparency = 0.5
-                        cache.Highlight.OutlineTransparency = 0
-                        cache.Highlight.OutlineColor = Color3.new(1,1,1)
-                        
-                    elseif Visuals.Type == "Box" then
-                        local hOffset = Vector3.new(head.Position.X, head.Position.Y + 0.5, head.Position.Z)
-                        local lOffset = Vector3.new(hrp.Position.X, hrp.Position.Y - 3, hrp.Position.Z)
-                        
-                        local headPos = Camera:WorldToViewportPoint(hOffset)
-                        local legPos = Camera:WorldToViewportPoint(lOffset)
-                        
-                        local height = math.abs(headPos.Y - legPos.Y)
-                        local width = height / 2
+                    -- Math bypassed for executor compatibility
+                    local hOffset = Vector3.new(head.Position.X, head.Position.Y + 0.5, head.Position.Z)
+                    local lOffset = Vector3.new(hrp.Position.X, hrp.Position.Y - 3, hrp.Position.Z)
+                    
+                    local headPos = Camera:WorldToViewportPoint(hOffset)
+                    local legPos = Camera:WorldToViewportPoint(lOffset)
+                    
+                    local height = math.abs(headPos.Y - legPos.Y)
+                    local width = height / 2
 
-                        cache.Box.Visible = true
-                        cache.Box.Size = Vector2.new(width, height)
-                        cache.Box.Position = Vector2.new(hrpPos.X - width / 2, headPos.Y)
-                        cache.Box.Color = useColor
+                    -- Box ESP (Default)
+                    cache.Box.Visible = true
+                    cache.Box.Size = Vector2.new(width, height)
+                    cache.Box.Position = Vector2.new(hrpPos.X - width / 2, headPos.Y)
+                    cache.Box.Color = useColor
 
-                        if Visuals.HealthBar then
-                            cache.HealthBarBg.Visible = true
-                            cache.HealthBarBg.From = Vector2.new(cache.Box.Position.X - 5, cache.Box.Position.Y + height)
-                            cache.HealthBarBg.To = Vector2.new(cache.Box.Position.X - 5, cache.Box.Position.Y)
+                    -- Health Bar
+                    if Visuals.HealthBar then
+                        cache.HealthBarBg.Visible = true
+                        cache.HealthBarBg.From = Vector2.new(cache.Box.Position.X - 5, cache.Box.Position.Y + height)
+                        cache.HealthBarBg.To = Vector2.new(cache.Box.Position.X - 5, cache.Box.Position.Y)
 
-                            cache.HealthBar.Visible = true
-                            cache.HealthBar.From = Vector2.new(cache.Box.Position.X - 5, cache.Box.Position.Y + height)
-                            local healthPerc = math.clamp(hum.Health / hum.MaxHealth, 0, 1)
-                            cache.HealthBar.To = Vector2.new(cache.Box.Position.X - 5, cache.Box.Position.Y + height - (height * healthPerc))
-                            cache.HealthBar.Color = Color3.new(1 - healthPerc, healthPerc, 0)
-                        end
-                        
-                    elseif Visuals.Type == "Skeleton" then
-                        cache.Spine.Visible = true
-                        local head2D = Camera:WorldToViewportPoint(head.Position)
-                        cache.Spine.From = Vector2.new(head2D.X, head2D.Y)
-                        cache.Spine.To = Vector2.new(hrpPos.X, hrpPos.Y)
-                        cache.Spine.Color = useColor
+                        cache.HealthBar.Visible = true
+                        cache.HealthBar.From = Vector2.new(cache.Box.Position.X - 5, cache.Box.Position.Y + height)
+                        local healthPerc = math.clamp(hum.Health / hum.MaxHealth, 0, 1)
+                        cache.HealthBar.To = Vector2.new(cache.Box.Position.X - 5, cache.Box.Position.Y + height - (height * healthPerc))
+                        cache.HealthBar.Color = Color3.new(1 - healthPerc, healthPerc, 0)
+                    else
+                        cache.HealthBarBg.Visible = false
+                        cache.HealthBar.Visible = false
                     end
 
+                    -- Text Info
                     if Visuals.Names or Visuals.Distance then
                         local textStr = ""
                         if Visuals.Names then textStr = textStr .. v.Name end
@@ -199,7 +185,11 @@ RunService.RenderStepped:Connect(function()
                         cache.Text.Text = textStr
                         cache.Text.Position = Vector2.new(hrpPos.X, hrpPos.Y - 40)
                         cache.Text.Color = useColor
+                    else
+                        cache.Text.Visible = false
                     end
+                else
+                    HideCache(cache)
                 end
             else
                 HideCache(cache)
@@ -210,11 +200,9 @@ end)
 
 Players.PlayerRemoving:Connect(function(plr)
     if ESP_Cache[plr] then
-        if ESP_Cache[plr].Highlight then ESP_Cache[plr].Highlight:Destroy() end
         if ESP_Cache[plr].Box then ESP_Cache[plr].Box:Remove() end
         if ESP_Cache[plr].HealthBarBg then ESP_Cache[plr].HealthBarBg:Remove() end
         if ESP_Cache[plr].HealthBar then ESP_Cache[plr].HealthBar:Remove() end
-        if ESP_Cache[plr].Spine then ESP_Cache[plr].Spine:Remove() end
         if ESP_Cache[plr].Text then ESP_Cache[plr].Text:Remove() end
         ESP_Cache[plr] = nil
     end
@@ -259,8 +247,23 @@ local function aimbotKeyUp()
     Target = nil
 end
 
+--// SECTION: Input Hooks (Aimbot & Click TP)
 UserInputService.InputBegan:Connect(function(input, gp)
     if gp then return end
+    
+    -- Click TP Logic (Ctrl + Left Click)
+    if input.UserInputType == Enum.UserInputType.MouseButton1 then
+        if Movement.ClickTP and UserInputService:IsKeyDown(Enum.KeyCode.LeftControl) then
+            if Mouse.Hit then
+                local char = Player.Character
+                if char and char:FindFirstChild("HumanoidRootPart") then
+                    char.HumanoidRootPart.CFrame = CFrame.new(Mouse.Hit.Position + Vector3.new(0, 3, 0))
+                end
+            end
+        end
+    end
+
+    -- Aimbot Key Check
     local key = (input.UserInputType == Enum.UserInputType.Keyboard) and input.KeyCode.Name or input.UserInputType.Name
     if key == Aimbot.Keybind then aimbotKeyDown() end
 end)
@@ -309,7 +312,8 @@ local win = Starlight:CreateWindow({
     Icon = 101065953742739,
     LoadingEnabled = true,
     LoadingSettings = { Title = "Yart Hub", Subtitle = "Detecting game..." },
-    FileSettings = { RootFolder = "YartHub", ConfigFolder = "configs" }
+    -- Changed Folder to bypass corrupted keybind saves!
+    FileSettings = { RootFolder = "YartHub", ConfigFolder = "YartConfigs" } 
 })
 
 win:CreateHomeTab({
@@ -344,13 +348,7 @@ trigGroup:CreateSlider({Name = "Click Delay", Range = {0, 0.5}, Increment = 0.01
 local visualTab = universalSection:CreateTab({Name = "Visuals", Columns = 2, Icon = NebulaIcons:GetIcon("eye", "Lucide")}, "uni_vis")
 
 local espGroup = visualTab:CreateGroupbox({Name = "ESP Features", Column = 1}, "esp_gb")
-espGroup:CreateToggle({Name = "ESP", Callback = function(v) Visuals.Enabled = v end}, "esp_master")
-
--- Bypassed Dropdown limitation with clean Toggles
-espGroup:CreateToggle({Name = "Highlight Mode", Callback = function(v) if v then Visuals.Type = "Highlight" end end}, "esp_type_hl")
-espGroup:CreateToggle({Name = "Box Mode", Callback = function(v) if v then Visuals.Type = "Box" end end}, "esp_type_bx")
-espGroup:CreateToggle({Name = "Skeleton Mode", Callback = function(v) if v then Visuals.Type = "Skeleton" end end}, "esp_type_sk")
-
+espGroup:CreateToggle({Name = "Enable Box ESP", Callback = function(v) Visuals.Enabled = v end}, "esp_master")
 espGroup:CreateToggle({Name = "Show Names", Callback = function(v) Visuals.Names = v end}, "esp_names")
 espGroup:CreateToggle({Name = "Show Distance", Callback = function(v) Visuals.Distance = v end}, "esp_dist")
 espGroup:CreateToggle({Name = "Show Health Bar", Callback = function(v) Visuals.HealthBar = v end}, "esp_hp")
@@ -380,9 +378,10 @@ physGroup:CreateToggle({Name = "Enable JumpPower", Callback = function(v)
 end}, "jp_enable")
 physGroup:CreateSlider({Name = "JumpPower Value", Range = {50, 300}, CurrentValue = 50, Callback = function(v) Movement.JPValue = v end}, "jp_val")
 
-local tpGroup = moveTab:CreateGroupbox({Name = "TP Walk", Column = 2}, "tp_gb")
+local tpGroup = moveTab:CreateGroupbox({Name = "Utility", Column = 2}, "tp_gb")
 tpGroup:CreateToggle({Name = "Enable TP Walk", Callback = function(v) Movement.TPWalk = v end}, "tp_enable")
 tpGroup:CreateSlider({Name = "TP Walk Speed", Range = {10, 200}, CurrentValue = 50, Callback = function(v) Movement.TPSpeed = v end}, "tp_val")
+tpGroup:CreateToggle({Name = "Click TP (Ctrl + Click)", Callback = function(v) Movement.ClickTP = v end}, "clicktp_enable")
 
 
 --// SECTION: THE STRONGEST BATTLEGROUNDS
