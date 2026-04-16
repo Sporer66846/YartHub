@@ -37,7 +37,7 @@ local Aimbot = {
     BulletVelocity = 1000,
     BulletDrop = 0,
     FOV = 100,
-    Keybind = "MouseButton2"
+    Keybind = "E" -- Fixed: Starlight Keybinds require valid KeyCodes
 }
 
 local Triggerbot = { Enabled = false, Delay = 0.05 }
@@ -153,7 +153,6 @@ RunService.RenderStepped:Connect(function()
                         cache.Highlight.OutlineColor = Color3.new(1,1,1)
                         
                     elseif Visuals.Type == "Box" then
-                        -- Math bypassed for executor compatibility
                         local hOffset = Vector3.new(head.Position.X, head.Position.Y + 0.5, head.Position.Z)
                         local lOffset = Vector3.new(hrp.Position.X, hrp.Position.Y - 3, hrp.Position.Z)
                         
@@ -241,7 +240,6 @@ local function aimbotKeyDown()
                 local targetVel = Target.Character.HumanoidRootPart.AssemblyLinearVelocity
                 local drop = 0.5 * Aimbot.BulletDrop * (timeToHit ^ 2)
                 
-                -- Math bypassed for executor compatibility
                 position = Vector3.new(
                     position.X + (targetVel.X * timeToHit),
                     position.Y + (targetVel.Y * timeToHit) + drop,
@@ -297,7 +295,6 @@ RunService.Heartbeat:Connect(function(dt)
     if Movement.JPEnabled then hum.UseJumpPower = true hum.JumpPower = Movement.JPValue end
 
     if Movement.TPWalk and hum.MoveDirection.Magnitude > 0 then
-        -- Math bypassed for executor compatibility
         local offset = hum.MoveDirection * Movement.TPSpeed * dt
         local newPos = Vector3.new(hrp.Position.X + offset.X, hrp.Position.Y + offset.Y, hrp.Position.Z + offset.Z)
         hrp.CFrame = CFrame.new(newPos) * hrp.CFrame.Rotation
@@ -332,7 +329,7 @@ aimGroup:CreateToggle({Name = "Enable Aimbot", Callback = function(v) Aimbot.Ena
 aimGroup:CreateToggle({Name = "Show FOV Circle", Callback = function(v) Aimbot.ShowFOV = v end}, "aim_fov_tgl")
 aimGroup:CreateSlider({Name = "Smoothness", Range = {0.1, 1}, Increment = 0.05, CurrentValue = 0.5, Callback = function(v) Aimbot.Smoothness = v end}, "aim_smooth")
 aimGroup:CreateSlider({Name = "FOV Radius", Range = {10, 800}, CurrentValue = 100, Callback = function(v) Aimbot.FOV = v end}, "aim_fov")
-aimGroup:CreateLabel({Name = "Aimbot Keybind"}, "aim_key_lbl"):AddBind({CurrentValue = "MouseButton2", OnChangedCallback = function(key) Aimbot.Keybind = key end}, "aim_key")
+aimGroup:CreateLabel({Name = "Aimbot Keybind"}, "aim_key_lbl"):AddBind({CurrentValue = "E", OnChangedCallback = function(key) Aimbot.Keybind = key end}, "aim_key")
 
 local predGroup = combatTab:CreateGroupbox({Name = "Prediction Settings", Column = 1}, "pred_gb")
 predGroup:CreateToggle({Name = "Enable Prediction", Callback = function(v) Aimbot.Prediction = v end}, "aim_pred_tgl")
@@ -348,13 +345,11 @@ local visualTab = universalSection:CreateTab({Name = "Visuals", Columns = 2, Ico
 
 local espGroup = visualTab:CreateGroupbox({Name = "ESP Features", Column = 1}, "esp_gb")
 espGroup:CreateToggle({Name = "ESP", Callback = function(v) Visuals.Enabled = v end}, "esp_master")
-espGroup:CreateDropdown({
-    Name = "ESP Type",
-    Options = {"Highlight", "Box", "Skeleton", "None"},
-    CurrentOption = {"Highlight"},
-    MultipleOptions = false,
-    Callback = function(val) Visuals.Type = type(val) == "table" and val[1] or val end
-}, "esp_type")
+
+-- Bypassed Dropdown limitation with clean Toggles
+espGroup:CreateToggle({Name = "Highlight Mode", Callback = function(v) if v then Visuals.Type = "Highlight" end end}, "esp_type_hl")
+espGroup:CreateToggle({Name = "Box Mode", Callback = function(v) if v then Visuals.Type = "Box" end end}, "esp_type_bx")
+espGroup:CreateToggle({Name = "Skeleton Mode", Callback = function(v) if v then Visuals.Type = "Skeleton" end end}, "esp_type_sk")
 
 espGroup:CreateToggle({Name = "Show Names", Callback = function(v) Visuals.Names = v end}, "esp_names")
 espGroup:CreateToggle({Name = "Show Distance", Callback = function(v) Visuals.Distance = v end}, "esp_dist")
