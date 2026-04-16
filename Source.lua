@@ -44,7 +44,7 @@ local Triggerbot = { Enabled = false, Delay = 0.05 }
 
 local Visuals = {
     Enabled = false,
-    Type = "Highlight", -- Highlight, Box, Skeleton, None
+    Type = "Highlight", 
     Names = false,
     Distance = false,
     HealthBar = false,
@@ -103,7 +103,6 @@ RunService.RenderStepped:Connect(function()
 
     for _, v in pairs(Players:GetPlayers()) do
         if v ~= Player then
-            -- Initialize cache for new players
             if not ESP_Cache[v] then
                 ESP_Cache[v] = {
                     Highlight = Instance.new("Highlight"),
@@ -126,7 +125,6 @@ RunService.RenderStepped:Connect(function()
 
             local cache = ESP_Cache[v]
             
-            -- If Visuals are completely disabled, just hide them
             if not Visuals.Enabled then
                 HideCache(cache)
                 continue
@@ -145,10 +143,9 @@ RunService.RenderStepped:Connect(function()
                 if Visuals.Rainbow then useColor = rainbowColor
                 elseif Visuals.TeamColor and v.Team then useColor = v.TeamColor.Color end
 
-                HideCache(cache) -- Reset visibility state before determining what to draw
+                HideCache(cache)
 
                 if onScreen then
-                    -- 1. Main ESP Types
                     if Visuals.Type == "Highlight" then
                         cache.Highlight.Adornee = char
                         cache.Highlight.FillColor = useColor
@@ -185,7 +182,6 @@ RunService.RenderStepped:Connect(function()
                         cache.Spine.Color = useColor
                     end
 
-                    -- 2. Text Info (Names & Distance)
                     if Visuals.Names or Visuals.Distance then
                         local textStr = ""
                         if Visuals.Names then textStr = textStr .. v.Name end
@@ -207,7 +203,6 @@ RunService.RenderStepped:Connect(function()
     end
 end)
 
--- Clean up leaving players
 Players.PlayerRemoving:Connect(function(plr)
     if ESP_Cache[plr] then
         if ESP_Cache[plr].Highlight then ESP_Cache[plr].Highlight:Destroy() end
@@ -402,4 +397,3 @@ configTab:BuildThemeGroupbox(1)
 configTab:BuildConfigGroupbox(2)
 
 Starlight:LoadAutoloadConfig()
-Starlight:LoadAutoloadTheme()
