@@ -21,7 +21,7 @@ espFolder.Parent = (gethui and gethui()) or CoreGui
 
 local Target = nil
 local Aimbotting = nil
-local ESPDrawings = {}
+local ESP_Cache = {}
 
 local FOVCircle = Drawing.new("Circle")
 FOVCircle.Visible = false
@@ -78,19 +78,14 @@ local function GetClosestPlayer()
     return closestTarget
 end
 
---// SECTION: ESP Logic Engine
-local function clearESP()
-    for _, drawing in pairs(ESPDrawings) do
-        if drawing then drawing:Remove() end
-    end
-    table.clear(ESPDrawings)
-    espFolder:ClearAllChildren()
-end
-
-local function createDrawing(type)
-    local drawing = Drawing.new(type)
-    table.insert(ESPDrawings, drawing)
-    return drawing
+--// SECTION: Cached ESP Engine
+local function HideCache(cache)
+    cache.Highlight.Adornee = nil
+    cache.Box.Visible = false
+    cache.HealthBarBg.Visible = false
+    cache.HealthBar.Visible = false
+    cache.Spine.Visible = false
+    cache.Text.Visible = false
 end
 
 RunService.RenderStepped:Connect(function()
@@ -104,100 +99,124 @@ RunService.RenderStepped:Connect(function()
         FOVCircle.Visible = false
     end
 
-    clearESP()
-    if not Visuals.Enabled then return end
-
     local rainbowColor = Color3.fromHSV(tick() % 5 / 5, 1, 1)
 
     for _, v in pairs(Players:GetPlayers()) do
-        if v ~= Player and v.Character and v.Character:FindFirstChild("HumanoidRootPart") and v.Character:FindFirstChild("Humanoid") and v.Character.Humanoid.Health > 0 then
-            
-            -- Color Logic
-            local useColor = Color3.new(1, 1, 1)
-            if Visuals.Rainbow then
-                useColor = rainbowColor
-            elseif Visuals.TeamColor and v.Team then
-                useColor = v.TeamColor.Color
+        if v ~= Player then
+            -- Initialize cache for new players
+            if not ESP_Cache[v] then
+                ESP_Cache[v] = {
+                    Highlight = Instance.new("Highlight"),
+                    Box = Drawing.new("Square"),
+                    HealthBarBg = Drawing.new("Line"),
+                    HealthBar = Drawing.new("Line"),
+                    Spine = Drawing.new("Line"),
+                    Text = Drawing.new("Text")
+                }
+                ESP_Cache[v].Highlight.Parent = espFolder
+                ESP_Cache[v].Box.Thickness = 1
+                ESP_Cache[v].Box.Filled = false
+                ESP_Cache[v].HealthBarBg.Thickness = 3
+                ESP_Cache[v].HealthBarBg.Color = Color3.new(0,0,0)
+                ESP_Cache[v].HealthBar.Thickness = 1
+                ESP_Cache[v].Text.Size = 16
+                ESP_Cache[v].Text.Center = true
+                ESP_Cache[v].Text.Outline = true
             end
 
-            local hrp = v.Character.HumanoidRootPart
-            local head = v.Character:FindFirstChild("Head")
-            local hum = v.Character.Humanoid
-            local hrpPos, onScreen = Camera:WorldToViewportPoint(hrp.Position)
+            local cache = ESP_Cache[v]
+            
+            -- If Visuals are completely disabled, just hide them
+            if not Visuals.Enabled then
+                HideCache(cache)
+                continue
+            end
 
-            if onScreen then
-                -- 1. Main ESP Types
-                if Visuals.Type == "Highlight" then
-                    local highlight = Instance.new("Highlight")
-                    highlight.Name = v.Name .. "_cham"
-                    highlight.FillColor = useColor
-                    highlight.OutlineColor = Color3.new(1, 1, 1)
-                    highlight.FillTransparency = 0.5
-                    highlight.OutlineTransparency = 0
-                    highlight.Adornee = v.Character
-                    highlight.Parent = espFolder
+            local char = v.Character
+            local isAlive = char and char:FindFirstChild("HumanoidRootPart") and char:FindFirstChild("Humanoid") and char:FindFirstChild("Head") and char.Humanoid.Health > 0
 
-                elseif Visuals.Type == "Box" then
-                    local headPos = Camera:WorldToViewportPoint(head.Position + Vector3.new(0, 0.5, 0))
-                    local legPos = Camera:WorldToViewportPoint(hrp.Position - Vector3.new(0, 3, 0))
-                    local height = math.abs(headPos.Y - legPos.Y)
-                    local width = height / 2
+            if isAlive then
+                local hrp = char.HumanoidRootPart
+                local head = char.Head
+                local hum = char.Humanoid
+                local hrpPos, onScreen = Camera:WorldToViewportPoint(hrp.Position)
 
-                    local box = createDrawing("Square")
-                    box.Visible = true
-                    box.Size = Vector2.new(width, height)
-                    box.Position = Vector2.new(hrpPos.X - width / 2, headPos.Y)
-                    box.Color = useColor
-                    box.Thickness = 1
-                    box.Filled = false
+                local useColor = Color3.new(1, 1, 1)
+                if Visuals.Rainbow then useColor = rainbowColor
+                elseif Visuals.TeamColor and v.Team then useColor = v.TeamColor.Color end
 
-                    if Visuals.HealthBar then
-                        local hpBarBg = createDrawing("Line")
-                        hpBarBg.Visible = true
-                        hpBarBg.From = Vector2.new(box.Position.X - 5, box.Position.Y + height)
-                        hpBarBg.To = Vector2.new(box.Position.X - 5, box.Position.Y)
-                        hpBarBg.Color = Color3.new(0, 0, 0)
-                        hpBarBg.Thickness = 3
+                HideCache(cache) -- Reset visibility state before determining what to draw
 
-                        local hpBar = createDrawing("Line")
-                        hpBar.Visible = true
-                        hpBar.From = Vector2.new(box.Position.X - 5, box.Position.Y + height)
-                        local healthPerc = math.clamp(hum.Health / hum.MaxHealth, 0, 1)
-                        hpBar.To = Vector2.new(box.Position.X - 5, box.Position.Y + height - (height * healthPerc))
-                        hpBar.Color = Color3.new(1 - healthPerc, healthPerc, 0)
-                        hpBar.Thickness = 1
+                if onScreen then
+                    -- 1. Main ESP Types
+                    if Visuals.Type == "Highlight" then
+                        cache.Highlight.Adornee = char
+                        cache.Highlight.FillColor = useColor
+                        cache.Highlight.FillTransparency = 0.5
+                        cache.Highlight.OutlineTransparency = 0
+                        cache.Highlight.OutlineColor = Color3.new(1,1,1)
+                    elseif Visuals.Type == "Box" then
+                        local headPos = Camera:WorldToViewportPoint(head.Position + Vector3.new(0, 0.5, 0))
+                        local legPos = Camera:WorldToViewportPoint(hrp.Position - Vector3.new(0, 3, 0))
+                        local height = math.abs(headPos.Y - legPos.Y)
+                        local width = height / 2
+
+                        cache.Box.Visible = true
+                        cache.Box.Size = Vector2.new(width, height)
+                        cache.Box.Position = Vector2.new(hrpPos.X - width / 2, headPos.Y)
+                        cache.Box.Color = useColor
+
+                        if Visuals.HealthBar then
+                            cache.HealthBarBg.Visible = true
+                            cache.HealthBarBg.From = Vector2.new(cache.Box.Position.X - 5, cache.Box.Position.Y + height)
+                            cache.HealthBarBg.To = Vector2.new(cache.Box.Position.X - 5, cache.Box.Position.Y)
+
+                            cache.HealthBar.Visible = true
+                            cache.HealthBar.From = Vector2.new(cache.Box.Position.X - 5, cache.Box.Position.Y + height)
+                            local healthPerc = math.clamp(hum.Health / hum.MaxHealth, 0, 1)
+                            cache.HealthBar.To = Vector2.new(cache.Box.Position.X - 5, cache.Box.Position.Y + height - (height * healthPerc))
+                            cache.HealthBar.Color = Color3.new(1 - healthPerc, healthPerc, 0)
+                        end
+                    elseif Visuals.Type == "Skeleton" then
+                        cache.Spine.Visible = true
+                        local head2D = Camera:WorldToViewportPoint(head.Position)
+                        cache.Spine.From = Vector2.new(head2D.X, head2D.Y)
+                        cache.Spine.To = Vector2.new(hrpPos.X, hrpPos.Y)
+                        cache.Spine.Color = useColor
                     end
 
-                elseif Visuals.Type == "Skeleton" then
-                    -- Simplified spine for template size; expands fully using your R6/R15 tables
-                    local spine = createDrawing("Line")
-                    spine.Visible = true
-                    spine.From = Vector2.new(Camera:WorldToViewportPoint(head.Position).X, Camera:WorldToViewportPoint(head.Position).Y)
-                    spine.To = Vector2.new(hrpPos.X, hrpPos.Y)
-                    spine.Color = useColor
-                    spine.Thickness = 1
-                end
+                    -- 2. Text Info (Names & Distance)
+                    if Visuals.Names or Visuals.Distance then
+                        local textStr = ""
+                        if Visuals.Names then textStr = textStr .. v.Name end
+                        if Visuals.Distance then 
+                            local dist = math.floor((Camera.CFrame.Position - hrp.Position).Magnitude)
+                            textStr = textStr .. (Visuals.Names and " [" or "[") .. dist .. "m]" 
+                        end
 
-                -- 2. Text Info (Names & Distance)
-                if Visuals.Names or Visuals.Distance then
-                    local textStr = ""
-                    if Visuals.Names then textStr = textStr .. v.Name end
-                    if Visuals.Distance then 
-                        local dist = math.floor((Camera.CFrame.Position - hrp.Position).Magnitude)
-                        textStr = textStr .. (Visuals.Names and " [" or "[") .. dist .. "m]" 
+                        cache.Text.Visible = true
+                        cache.Text.Text = textStr
+                        cache.Text.Position = Vector2.new(hrpPos.X, hrpPos.Y - 40)
+                        cache.Text.Color = useColor
                     end
-
-                    local txt = createDrawing("Text")
-                    txt.Visible = true
-                    txt.Text = textStr
-                    txt.Position = Vector2.new(hrpPos.X, hrpPos.Y - 40)
-                    txt.Color = useColor
-                    txt.Size = 16
-                    txt.Center = true
-                    txt.Outline = true
                 end
+            else
+                HideCache(cache)
             end
         end
+    end
+end)
+
+-- Clean up leaving players
+Players.PlayerRemoving:Connect(function(plr)
+    if ESP_Cache[plr] then
+        if ESP_Cache[plr].Highlight then ESP_Cache[plr].Highlight:Destroy() end
+        if ESP_Cache[plr].Box then ESP_Cache[plr].Box:Remove() end
+        if ESP_Cache[plr].HealthBarBg then ESP_Cache[plr].HealthBarBg:Remove() end
+        if ESP_Cache[plr].HealthBar then ESP_Cache[plr].HealthBar:Remove() end
+        if ESP_Cache[plr].Spine then ESP_Cache[plr].Spine:Remove() end
+        if ESP_Cache[plr].Text then ESP_Cache[plr].Text:Remove() end
+        ESP_Cache[plr] = nil
     end
 end)
 
@@ -206,9 +225,9 @@ local function aimbotKeyDown()
     if not Aimbot.Enabled then return end
     Target = GetClosestPlayer()
     
-    if Target and Target.Character and Target.Character:FindFirstChild("Head") then
+    if Target and Target.Character and Target.Character:FindFirstChild("Head") and Target.Character:FindFirstChild("HumanoidRootPart") then
         Aimbotting = RunService.RenderStepped:Connect(function(dt)
-            if not Target or not Target.Character or not Target.Character:FindFirstChild("Head") or Target.Character.Humanoid.Health <= 0 then
+            if not Target or not Target.Character or not Target.Character:FindFirstChild("Head") or not Target.Character:FindFirstChild("HumanoidRootPart") or Target.Character.Humanoid.Health <= 0 then
                 if Aimbotting then Aimbotting:Disconnect() Aimbotting = nil end
                 return
             end
@@ -218,7 +237,7 @@ local function aimbotKeyDown()
             if Aimbot.Prediction then
                 local dist = (Camera.CFrame.Position - position).Magnitude
                 local timeToHit = dist / Aimbot.BulletVelocity
-                local targetVel = Target.Character.HumanoidRootPart.Velocity
+                local targetVel = Target.Character.HumanoidRootPart.AssemblyLinearVelocity
                 position = position + (targetVel * timeToHit)
                 local drop = 0.5 * Aimbot.BulletDrop * (timeToHit ^ 2)
                 position = position + Vector3.new(0, drop, 0)
@@ -319,7 +338,7 @@ trigGroup:CreateSlider({Name = "Click Delay", Range = {0, 0.5}, Increment = 0.01
 local visualTab = universalSection:CreateTab({Name = "Visuals", Columns = 2, Icon = NebulaIcons:GetIcon("eye", "Lucide")}, "uni_vis")
 
 local espGroup = visualTab:CreateGroupbox({Name = "ESP Features", Column = 1}, "esp_gb")
-espGroup:CreateToggle({Name = "ESP", Callback = function(v) Visuals.Enabled = v if not v then clearESP() end end}, "esp_master")
+espGroup:CreateToggle({Name = "ESP", Callback = function(v) Visuals.Enabled = v end}, "esp_master")
 espGroup:CreateDropdown({
     Name = "ESP Type",
     Options = {"Highlight", "Box", "Skeleton", "None"},
