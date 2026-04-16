@@ -21,9 +21,17 @@ espFolder.Parent = (gethui and gethui()) or CoreGui
 
 local Target = nil
 local Aimbotting = nil
+local ESPDrawings = {}
+
+local FOVCircle = Drawing.new("Circle")
+FOVCircle.Visible = false
+FOVCircle.Thickness = 1
+FOVCircle.Filled = false
+FOVCircle.Color = Color3.new(1, 1, 1)
 
 local Aimbot = {
     Enabled = false,
+    ShowFOV = false,
     Smoothness = 0.5,
     Prediction = false,
     BulletVelocity = 1000,
@@ -32,28 +40,23 @@ local Aimbot = {
     Keybind = "MouseButton2"
 }
 
-local Triggerbot = {
-    Enabled = false,
-    Delay = 0.05
-}
+local Triggerbot = { Enabled = false, Delay = 0.05 }
 
 local Visuals = {
     Enabled = false,
-    Chams = false,
-    Skeletons = false,
-    Names = false
+    Type = "Highlight", -- Highlight, Box, Skeleton, None
+    Names = false,
+    Distance = false,
+    HealthBar = false,
+    TeamColor = false,
+    Rainbow = false
 }
 
 local Movement = {
-    WSEnabled = false,
-    WSValue = 16,
-    JPEnabled = false,
-    JPValue = 50,
-    TPWalk = false,
-    TPSpeed = 50
+    WSEnabled = false, WSValue = 16,
+    JPEnabled = false, JPValue = 50,
+    TPWalk = false, TPSpeed = 50
 }
-
-local ESPDrawings = {}
 
 --// SECTION: Utility & Math Functions
 local function GetClosestPlayer()
@@ -84,61 +87,121 @@ local function clearESP()
     espFolder:ClearAllChildren()
 end
 
-local function drawText(text, pos, color)
-    local txt = Drawing.new("Text")
-    txt.Text = text
-    txt.Position = pos
-    txt.Color = color
-    txt.Size = 16
-    txt.Center = true
-    txt.Outline = true
-    txt.Visible = true
-    table.insert(ESPDrawings, txt)
-    return txt
+local function createDrawing(type)
+    local drawing = Drawing.new(type)
+    table.insert(ESPDrawings, drawing)
+    return drawing
 end
 
 RunService.RenderStepped:Connect(function()
+    -- FOV Circle Logic
+    if Aimbot.ShowFOV then
+        FOVCircle.Visible = true
+        FOVCircle.Radius = Aimbot.FOV
+        FOVCircle.Position = UserInputService:GetMouseLocation()
+        FOVCircle.Color = Visuals.Rainbow and Color3.fromHSV(tick() % 5 / 5, 1, 1) or Color3.new(1, 1, 1)
+    else
+        FOVCircle.Visible = false
+    end
+
     clearESP()
     if not Visuals.Enabled then return end
+
+    local rainbowColor = Color3.fromHSV(tick() % 5 / 5, 1, 1)
 
     for _, v in pairs(Players:GetPlayers()) do
         if v ~= Player and v.Character and v.Character:FindFirstChild("HumanoidRootPart") and v.Character:FindFirstChild("Humanoid") and v.Character.Humanoid.Health > 0 then
             
-            -- Chams Logic
-            if Visuals.Chams then
-                local highlight = espFolder:FindFirstChild(v.Name .. "_cham")
-                if not highlight then
-                    highlight = Instance.new("Highlight")
+            -- Color Logic
+            local useColor = Color3.new(1, 1, 1)
+            if Visuals.Rainbow then
+                useColor = rainbowColor
+            elseif Visuals.TeamColor and v.Team then
+                useColor = v.TeamColor.Color
+            end
+
+            local hrp = v.Character.HumanoidRootPart
+            local head = v.Character:FindFirstChild("Head")
+            local hum = v.Character.Humanoid
+            local hrpPos, onScreen = Camera:WorldToViewportPoint(hrp.Position)
+
+            if onScreen then
+                -- 1. Main ESP Types
+                if Visuals.Type == "Highlight" then
+                    local highlight = Instance.new("Highlight")
                     highlight.Name = v.Name .. "_cham"
-                    highlight.FillColor = Color3.new(1, 0, 0)
+                    highlight.FillColor = useColor
                     highlight.OutlineColor = Color3.new(1, 1, 1)
                     highlight.FillTransparency = 0.5
                     highlight.OutlineTransparency = 0
+                    highlight.Adornee = v.Character
                     highlight.Parent = espFolder
-                end
-                highlight.Adornee = v.Character
-            end
 
-            -- Names Logic
-            if Visuals.Names then
-                local head = v.Character:FindFirstChild("Head")
-                if head then
-                    local pos, onScreen = Camera:WorldToViewportPoint(head.Position + Vector3.new(0, 2, 0))
-                    if onScreen then
-                        drawText(v.Name, Vector2.new(pos.X, pos.Y), Color3.new(1, 1, 1))
+                elseif Visuals.Type == "Box" then
+                    local headPos = Camera:WorldToViewportPoint(head.Position + Vector3.new(0, 0.5, 0))
+                    local legPos = Camera:WorldToViewportPoint(hrp.Position - Vector3.new(0, 3, 0))
+                    local height = math.abs(headPos.Y - legPos.Y)
+                    local width = height / 2
+
+                    local box = createDrawing("Square")
+                    box.Visible = true
+                    box.Size = Vector2.new(width, height)
+                    box.Position = Vector2.new(hrpPos.X - width / 2, headPos.Y)
+                    box.Color = useColor
+                    box.Thickness = 1
+                    box.Filled = false
+
+                    if Visuals.HealthBar then
+                        local hpBarBg = createDrawing("Line")
+                        hpBarBg.Visible = true
+                        hpBarBg.From = Vector2.new(box.Position.X - 5, box.Position.Y + height)
+                        hpBarBg.To = Vector2.new(box.Position.X - 5, box.Position.Y)
+                        hpBarBg.Color = Color3.new(0, 0, 0)
+                        hpBarBg.Thickness = 3
+
+                        local hpBar = createDrawing("Line")
+                        hpBar.Visible = true
+                        hpBar.From = Vector2.new(box.Position.X - 5, box.Position.Y + height)
+                        local healthPerc = math.clamp(hum.Health / hum.MaxHealth, 0, 1)
+                        hpBar.To = Vector2.new(box.Position.X - 5, box.Position.Y + height - (height * healthPerc))
+                        hpBar.Color = Color3.new(1 - healthPerc, healthPerc, 0)
+                        hpBar.Thickness = 1
                     end
-                end
-            end
 
-            -- Skeleton Logic Placeholder (Expanded per your R6/R15 tables if needed)
-            if Visuals.Skeletons then
-                -- Add skeleton drawing math here based on R6/R15 arrays
+                elseif Visuals.Type == "Skeleton" then
+                    -- Simplified spine for template size; expands fully using your R6/R15 tables
+                    local spine = createDrawing("Line")
+                    spine.Visible = true
+                    spine.From = Vector2.new(Camera:WorldToViewportPoint(head.Position).X, Camera:WorldToViewportPoint(head.Position).Y)
+                    spine.To = Vector2.new(hrpPos.X, hrpPos.Y)
+                    spine.Color = useColor
+                    spine.Thickness = 1
+                end
+
+                -- 2. Text Info (Names & Distance)
+                if Visuals.Names or Visuals.Distance then
+                    local textStr = ""
+                    if Visuals.Names then textStr = textStr .. v.Name end
+                    if Visuals.Distance then 
+                        local dist = math.floor((Camera.CFrame.Position - hrp.Position).Magnitude)
+                        textStr = textStr .. (Visuals.Names and " [" or "[") .. dist .. "m]" 
+                    end
+
+                    local txt = createDrawing("Text")
+                    txt.Visible = true
+                    txt.Text = textStr
+                    txt.Position = Vector2.new(hrpPos.X, hrpPos.Y - 40)
+                    txt.Color = useColor
+                    txt.Size = 16
+                    txt.Center = true
+                    txt.Outline = true
+                end
             end
         end
     end
 end)
 
---// SECTION: Aimbot & Triggerbot Hooks
+--// SECTION: Aimbot Hook
 local function aimbotKeyDown()
     if not Aimbot.Enabled then return end
     Target = GetClosestPlayer()
@@ -152,16 +215,11 @@ local function aimbotKeyDown()
 
             local position = Target.Character.Head.Position
 
-            -- Advanced Prediction Math
             if Aimbot.Prediction then
                 local dist = (Camera.CFrame.Position - position).Magnitude
                 local timeToHit = dist / Aimbot.BulletVelocity
-                
-                -- Target Velocity compensation
                 local targetVel = Target.Character.HumanoidRootPart.Velocity
                 position = position + (targetVel * timeToHit)
-                
-                -- Bullet Drop compensation
                 local drop = 0.5 * Aimbot.BulletDrop * (timeToHit ^ 2)
                 position = position + Vector3.new(0, drop, 0)
             end
@@ -202,7 +260,7 @@ RunService.RenderStepped:Connect(function()
     end
 end)
 
---// SECTION: Movement Hooks
+--// SECTION: Movement Hook
 RunService.Heartbeat:Connect(function(dt)
     local char = Player.Character
     if not char or not char:FindFirstChild("Humanoid") or not char:FindFirstChild("HumanoidRootPart") then return end
@@ -211,10 +269,7 @@ RunService.Heartbeat:Connect(function(dt)
     local hrp = char.HumanoidRootPart
 
     if Movement.WSEnabled then hum.WalkSpeed = Movement.WSValue end
-    if Movement.JPEnabled then 
-        hum.UseJumpPower = true 
-        hum.JumpPower = Movement.JPValue 
-    end
+    if Movement.JPEnabled then hum.UseJumpPower = true hum.JumpPower = Movement.JPValue end
 
     if Movement.TPWalk and hum.MoveDirection.Magnitude > 0 then
         hrp.CFrame = hrp.CFrame + (hum.MoveDirection * Movement.TPSpeed * dt)
@@ -246,6 +301,7 @@ local combatTab = universalSection:CreateTab({Name = "Combat", Columns = 2, Icon
 
 local aimGroup = combatTab:CreateGroupbox({Name = "Aimbot Settings", Column = 1}, "aim_gb")
 aimGroup:CreateToggle({Name = "Enable Aimbot", Callback = function(v) Aimbot.Enabled = v if not v then aimbotKeyUp() end end}, "aim_enable")
+aimGroup:CreateToggle({Name = "Show FOV Circle", Callback = function(v) Aimbot.ShowFOV = v end}, "aim_fov_tgl")
 aimGroup:CreateSlider({Name = "Smoothness", Range = {0.1, 1}, Increment = 0.05, CurrentValue = 0.5, Callback = function(v) Aimbot.Smoothness = v end}, "aim_smooth")
 aimGroup:CreateSlider({Name = "FOV Radius", Range = {10, 800}, CurrentValue = 100, Callback = function(v) Aimbot.FOV = v end}, "aim_fov")
 aimGroup:CreateLabel({Name = "Aimbot Keybind"}, "aim_key_lbl"):AddBind({CurrentValue = "MouseButton2", OnChangedCallback = function(key) Aimbot.Keybind = key end}, "aim_key")
@@ -262,22 +318,43 @@ trigGroup:CreateSlider({Name = "Click Delay", Range = {0, 0.5}, Increment = 0.01
 -- 2. VISUALS
 local visualTab = universalSection:CreateTab({Name = "Visuals", Columns = 2, Icon = NebulaIcons:GetIcon("eye", "Lucide")}, "uni_vis")
 
-local espGroup = visualTab:CreateGroupbox({Name = "ESP Settings", Column = 1}, "esp_gb")
-espGroup:CreateToggle({Name = "Master ESP Switch", Callback = function(v) Visuals.Enabled = v if not v then clearESP() end end}, "esp_master")
-espGroup:CreateToggle({Name = "Show Names", Callback = function(v) Visuals.Names = v end}, "esp_names")
-espGroup:CreateToggle({Name = "Show Skeletons", Callback = function(v) Visuals.Skeletons = v end}, "esp_skel")
+local espGroup = visualTab:CreateGroupbox({Name = "ESP Features", Column = 1}, "esp_gb")
+espGroup:CreateToggle({Name = "ESP", Callback = function(v) Visuals.Enabled = v if not v then clearESP() end end}, "esp_master")
+espGroup:CreateDropdown({
+    Name = "ESP Type",
+    Options = {"Highlight", "Box", "Skeleton", "None"},
+    CurrentOption = {"Highlight"},
+    MultipleOptions = false,
+    Callback = function(val) Visuals.Type = type(val) == "table" and val[1] or val end
+}, "esp_type")
 
-local chamGroup = visualTab:CreateGroupbox({Name = "Chams", Column = 2}, "cham_gb")
-chamGroup:CreateToggle({Name = "Enable Chams", Callback = function(v) Visuals.Chams = v end}, "esp_chams")
+espGroup:CreateToggle({Name = "Show Names", Callback = function(v) Visuals.Names = v end}, "esp_names")
+espGroup:CreateToggle({Name = "Show Distance", Callback = function(v) Visuals.Distance = v end}, "esp_dist")
+espGroup:CreateToggle({Name = "Show Health Bar", Callback = function(v) Visuals.HealthBar = v end}, "esp_hp")
+
+local espColorGroup = visualTab:CreateGroupbox({Name = "Colors", Column = 2}, "esp_colors")
+espColorGroup:CreateToggle({Name = "Team Color", Callback = function(v) Visuals.TeamColor = v end}, "esp_team")
+espColorGroup:CreateToggle({Name = "Rainbow Mode", Callback = function(v) Visuals.Rainbow = v end}, "esp_rainbow")
 
 -- 3. MOVEMENT
 local moveTab = universalSection:CreateTab({Name = "Movement", Columns = 2, Icon = NebulaIcons:GetIcon("move", "Lucide")}, "uni_move")
 
 local physGroup = moveTab:CreateGroupbox({Name = "Player Physics", Column = 1}, "phys_gb")
-physGroup:CreateToggle({Name = "Enable WalkSpeed", Callback = function(v) Movement.WSEnabled = v end}, "ws_enable")
+physGroup:CreateToggle({Name = "Enable WalkSpeed", Callback = function(v) 
+    Movement.WSEnabled = v 
+    if not v and Player.Character and Player.Character:FindFirstChild("Humanoid") then
+        Player.Character.Humanoid.WalkSpeed = 16 
+    end
+end}, "ws_enable")
 physGroup:CreateSlider({Name = "WalkSpeed Value", Range = {16, 250}, CurrentValue = 16, Callback = function(v) Movement.WSValue = v end}, "ws_val")
 
-physGroup:CreateToggle({Name = "Enable JumpPower", Callback = function(v) Movement.JPEnabled = v end}, "jp_enable")
+physGroup:CreateToggle({Name = "Enable JumpPower", Callback = function(v) 
+    Movement.JPEnabled = v 
+    if not v and Player.Character and Player.Character:FindFirstChild("Humanoid") then
+        Player.Character.Humanoid.UseJumpPower = true
+        Player.Character.Humanoid.JumpPower = 50
+    end
+end}, "jp_enable")
 physGroup:CreateSlider({Name = "JumpPower Value", Range = {50, 300}, CurrentValue = 50, Callback = function(v) Movement.JPValue = v end}, "jp_val")
 
 local tpGroup = moveTab:CreateGroupbox({Name = "TP Walk", Column = 2}, "tp_gb")
