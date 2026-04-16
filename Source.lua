@@ -13,16 +13,15 @@ local Player = Players.LocalPlayer
 local Camera = workspace.CurrentCamera
 local Mouse = Player:GetMouse()
 
---// SECTION : Aimbot & Visuals Logic
+--// SECTION : Internal Script Logic (Aimbot & Visuals)
 local espFolder = Instance.new("Folder")
 espFolder.Name = "YartHub_ESP"
 espFolder.Parent = (gethui and gethui()) or game:GetService("CoreGui")
 
-local ESPDrawings = {}
 local Target = nil
 local Aimbotting = nil
 
--- Global settings synced with the Yart Hub UI
+-- State Management
 local Aimbot = {
     Enabled = false,
     Smoothness = 0.5,
@@ -31,26 +30,13 @@ local Aimbot = {
     Keybind = "MouseButton2"
 }
 
-local ESPSettings = {
+local Visuals = {
     Enabled = false,
-    ChamsEnabled = false,
-    ShowSkeletons = false
+    Chams = false,
+    Skeletons = false
 }
 
-local R6_Connections = {
-    {"Head", "Torso"}, {"Torso", "Left Arm"}, {"Torso", "Right Arm"},
-    {"Torso", "Left Leg"}, {"Torso", "Right Leg"}
-}
-
-local R15_Connections = {
-    {"Head", "UpperTorso"}, {"UpperTorso", "LowerTorso"},
-    {"UpperTorso", "LeftUpperArm"}, {"LeftUpperArm", "LeftLowerArm"}, {"LeftLowerArm", "LeftHand"},
-    {"UpperTorso", "RightUpperArm"}, {"RightUpperArm", "RightLowerArm"}, {"RightLowerArm", "RightHand"},
-    {"LowerTorso", "LeftUpperLeg"}, {"LeftUpperLeg", "LeftLowerLeg"}, {"LeftLowerLeg", "LeftFoot"},
-    {"LowerTorso", "RightUpperLeg"}, {"RightUpperLeg", "RightLowerLeg"}, {"RightLowerLeg", "RightFoot"}
-}
-
--- Utility Functions
+-- Target Selection Logic
 local function GetClosestPlayer()
     local closestDist = Aimbot.FOV
     local closestTarget = nil
@@ -70,7 +56,7 @@ local function GetClosestPlayer()
     return closestTarget
 end
 
--- Aimbot Core Connections
+-- Aimbot Execution
 local function aimbotKeyDown()
     if not Aimbot.Enabled then return end
     Target = GetClosestPlayer()
@@ -84,7 +70,7 @@ local function aimbotKeyDown()
 
             local position = Target.Character.Head.Position
 
-            -- Bullet Drop Math
+            -- Bullet Drop Math Integration
             if Aimbot.BulletDropAmount > 0 then
                 local dist = (Camera.CFrame.Position - position).Magnitude
                 local bulletTravelTime = dist / 1000 
@@ -92,7 +78,7 @@ local function aimbotKeyDown()
                 position = Vector3.new(position.X, position.Y + drop, position.Z)
             end
 
-            -- Lerping Math
+            -- CFrame Lerping Logic
             local newCFrame = CFrame.lookAt(Camera.CFrame.Position, position)
             local alpha = 1 - math.pow(1 - Aimbot.Smoothness, dt * 60)
             Camera.CFrame = Camera.CFrame:Lerp(newCFrame, math.clamp(alpha, 0, 1))
@@ -101,26 +87,23 @@ local function aimbotKeyDown()
 end
 
 local function aimbotKeyUp()
-    if Aimbotting then
-        Aimbotting:Disconnect()
-        Aimbotting = nil
-    end
+    if Aimbotting then Aimbotting:Disconnect() Aimbotting = nil end
     Target = nil
 end
 
-UserInputService.InputBegan:Connect(function(input, gameprocessed)
-    if gameprocessed then return end
-    local keyName = (input.UserInputType == Enum.UserInputType.Keyboard) and input.KeyCode.Name or input.UserInputType.Name
-    if keyName == Aimbot.Keybind then aimbotKeyDown() end
+-- Input Listeners
+UserInputService.InputBegan:Connect(function(input, gp)
+    if gp then return end
+    local key = (input.UserInputType == Enum.UserInputType.Keyboard) and input.KeyCode.Name or input.UserInputType.Name
+    if key == Aimbot.Keybind then aimbotKeyDown() end
 end)
 
-UserInputService.InputEnded:Connect(function(input, gameprocessed)
-    local keyName = (input.UserInputType == Enum.UserInputType.Keyboard) and input.KeyCode.Name or input.UserInputType.Name
-    if keyName == Aimbot.Keybind then aimbotKeyUp() end
+UserInputService.InputEnded:Connect(function(input)
+    local key = (input.UserInputType == Enum.UserInputType.Keyboard) and input.KeyCode.Name or input.UserInputType.Name
+    if key == Aimbot.Keybind then aimbotKeyUp() end
 end)
 
-
---// SECTION : Yart Hub Window Initialization
+--// SECTION : Window Initialization
 local win = Starlight:CreateWindow({
     Name = "Yart Hub",
     Subtitle = "Premium Script Hub",
@@ -129,7 +112,7 @@ local win = Starlight:CreateWindow({
     LoadingEnabled = true,
     LoadingSettings = {
         Title = "Yart Hub",
-        Subtitle = "Detecting game...",
+        Subtitle = "Detecting game...", -- Per your request
     },
     
     FileSettings = {
@@ -146,146 +129,101 @@ win:CreateHomeTab({
         {
             Title = "Release", 
             Date = "Current",
-            Description = "Aimbot and Visual Logic Successfully Integrated."
+            Description = "Official release of Yart Hub. Universal and Game-Specific modules active."
         }
     }
 })
 
---// SECTION : Game Routing Logic
-local Games = { TSB = 10449761463 }
+--// SECTION : UNIVERSAL TABS (Always Visible)
+local universalSection = win:CreateTabSection("UNIVERSAL")
 
-if game.PlaceId == Games.TSB then
-    local tsbSection = win:CreateTabSection("TSB FEATURES")
-    local combatTab = tsbSection:CreateTab({
-        Name = "Combat",
-        Columns = 2,
-        Icon = NebulaIcons:GetIcon("swords", "Lucide")
-    }, "tsb_combat")
+-- 1. AIMBOT
+local aimTab = universalSection:CreateTab({
+    Name = "Aimbot", Columns = 2, Icon = NebulaIcons:GetIcon("target", "Lucide")
+}, "uni_aim")
 
-    local mainGroup = combatTab:CreateGroupbox({Name = "TSB Automation", Column = 1}, "tsb_main")
-    mainGroup:CreateToggle({Name = "Auto Skills", Callback = function(v) end}, "tsb_skills")
+local aimGroup = aimTab:CreateGroupbox({Name = "Main Settings", Column = 1})
+aimGroup:CreateToggle({
+    Name = "Enable Aimbot", 
+    CurrentValue = false,
+    Callback = function(v) Aimbot.Enabled = v if not v then aimbotKeyUp() end end
+}, "aim_toggle")
 
---// SECTION : UNIVERSAL MODULES
-else
-    local universalSection = win:CreateTabSection("UNIVERSAL")
+aimGroup:CreateSlider({
+    Name = "Smoothness", Range = {0.1, 1}, Increment = 0.05, CurrentValue = 0.5,
+    Callback = function(v) Aimbot.Smoothness = v end
+}, "aim_smooth")
 
-    -- 1. VISUALS TAB
-    local visualsTab = universalSection:CreateTab({
-        Name = "Visuals",
-        Columns = 2,
-        Icon = NebulaIcons:GetIcon("eye", "Lucide")
-    }, "universal_visuals")
+local aimTargeting = aimTab:CreateGroupbox({Name = "Targeting", Column = 2})
+aimTargeting:CreateSlider({
+    Name = "FOV Radius", Range = {10, 800}, CurrentValue = 100,
+    Callback = function(v) Aimbot.FOV = v end
+}, "aim_fov")
 
-    local espGroup = visualsTab:CreateGroupbox({Name = "ESP Settings", Column = 1}, "esp_group")
-    
-    espGroup:CreateToggle({
-        Name = "Enable Master ESP",
-        CurrentValue = false,
-        Callback = function(state) 
-            ESPSettings.Enabled = state
-            if not state then
-                espFolder:ClearAllChildren()
-            end
-        end
-    }, "esp_master")
+aimTargeting:CreateLabel({Name = "Aimbot Keybind"}):AddBind({
+    CurrentValue = "MouseButton2",
+    OnChangedCallback = function(key) Aimbot.Keybind = key end
+}, "aim_bind")
 
-    espGroup:CreateToggle({
-        Name = "Draw Skeletons",
-        CurrentValue = false,
-        Callback = function(state) ESPSettings.ShowSkeletons = state end
-    }, "esp_skel")
-    
-    local chamGroup = visualsTab:CreateGroupbox({Name = "Chams", Column = 2}, "cham_group")
-    chamGroup:CreateToggle({
-        Name = "Enable Chams",
-        CurrentValue = false,
-        Callback = function(state) ESPSettings.ChamsEnabled = state end
-    }, "cham_toggle")
+-- 2. VISUALS
+local visualTab = universalSection:CreateTab({
+    Name = "Visuals", Columns = 2, Icon = NebulaIcons:GetIcon("eye", "Lucide")
+}, "uni_vis")
 
-    -- 2. MOVEMENT TAB
-    local moveTab = universalSection:CreateTab({
-        Name = "Movement",
-        Columns = 2,
-        Icon = NebulaIcons:GetIcon("move", "Lucide")
-    }, "universal_movement")
+local espGroup = visualTab:CreateGroupbox({Name = "ESP", Column = 1})
+espGroup:CreateToggle({
+    Name = "Master Switch", 
+    Callback = function(v) Visuals.Enabled = v if not v then espFolder:ClearAllChildren() end end
+}, "esp_master")
 
-    local physGroup = moveTab:CreateGroupbox({Name = "Physics", Column = 1}, "phys_group")
-    physGroup:CreateSlider({
-        Name = "WalkSpeed", Range = {16, 250}, CurrentValue = 16,
-        Callback = function(v) game.Players.LocalPlayer.Character.Humanoid.WalkSpeed = v end
-    }, "ws_slider")
-    
-    physGroup:CreateSlider({
-        Name = "JumpPower", Range = {50, 300}, CurrentValue = 50,
-        Callback = function(v) 
-            game.Players.LocalPlayer.Character.Humanoid.UseJumpPower = true
-            game.Players.LocalPlayer.Character.Humanoid.JumpPower = v 
-        end
-    }, "jp_slider")
+espGroup:CreateToggle({Name = "Show Skeletons", Callback = function(v) Visuals.Skeletons = v end}, "esp_skel")
 
-    -- 3. AIMBOT TAB
-    local aimTab = universalSection:CreateTab({
-        Name = "Aimbot",
-        Columns = 2,
-        Icon = NebulaIcons:GetIcon("target", "Lucide")
-    }, "universal_aim")
+local chamGroup = visualTab:CreateGroupbox({Name = "Chams", Column = 2})
+chamGroup:CreateToggle({Name = "Enable Chams", Callback = function(v) Visuals.Chams = v end}, "chams_on")
 
-    local aimGroup = aimTab:CreateGroupbox({Name = "Aimbot Controls", Column = 1}, "aim_group")
-    
-    aimGroup:CreateToggle({
-        Name = "Enable Aimbot", 
-        CurrentValue = false,
-        Callback = function(state) 
-            Aimbot.Enabled = state 
-            if not state then aimbotKeyUp() end
-        end
-    }, "aim_enabled")
-    
-    aimGroup:CreateSlider({
-        Name = "FOV Radius", 
-        Range = {10, 800}, 
-        CurrentValue = 100, 
-        Callback = function(v) Aimbot.FOV = v end
-    }, "aim_fov")
+-- 3. MOVEMENT
+local moveTab = universalSection:CreateTab({
+    Name = "Movement", Columns = 2, Icon = NebulaIcons:GetIcon("move", "Lucide")
+}, "uni_move")
 
-    aimGroup:CreateSlider({
-        Name = "Smoothness", 
-        Range = {0.1, 1}, 
-        Increment = 0.05,
-        CurrentValue = 0.5, 
-        Callback = function(v) Aimbot.Smoothness = v end
-    }, "aim_smooth")
+local physGroup = moveTab:CreateGroupbox({Name = "Modifiers", Column = 1})
+physGroup:CreateSlider({
+    Name = "WalkSpeed", Range = {16, 250}, CurrentValue = 16,
+    Callback = function(v) Player.Character.Humanoid.WalkSpeed = v end
+}, "ws_val")
 
-    aimGroup:CreateSlider({
-        Name = "Bullet Drop Prediction", 
-        Range = {0, 5}, 
-        Increment = 0.1,
-        CurrentValue = 0, 
-        Callback = function(v) Aimbot.BulletDropAmount = v end
-    }, "aim_drop")
+physGroup:CreateSlider({
+    Name = "JumpPower", Range = {50, 300}, CurrentValue = 50,
+    Callback = function(v) 
+        Player.Character.Humanoid.UseJumpPower = true
+        Player.Character.Humanoid.JumpPower = v 
+    end
+}, "jp_val")
 
-    local aimMisc = aimTab:CreateGroupbox({Name = "Keybinds", Column = 2}, "aim_misc")
-    
-    aimMisc:CreateLabel({Name = "Aimbot Keybind"}, "aim_key_lbl"):AddBind({
-        CurrentValue = "MouseButton2",
-        Callback = function() end,
-        OnChangedCallback = function(key) 
-            Aimbot.Keybind = key 
-        end
-    }, "aim_keybind")
+local exploitGroup = moveTab:CreateGroupbox({Name = "Utility", Column = 2})
+exploitGroup:CreateToggle({Name = "TP Walk", Callback = function(v) end}, "tpwalk")
+exploitGroup:CreateButton({Name = "Click TP", Callback = function() end}, "clicktp")
+
+--// SECTION : GAME SPECIFIC (TSB)
+if game.PlaceId == 10449761463 then
+    local tsbSection = win:CreateTabSection("GAME SPECIFIC")
+    local tsbTab = tsbSection:CreateTab({
+        Name = "Battlegrounds", Columns = 2, Icon = NebulaIcons:GetIcon("swords", "Lucide")
+    }, "tsb_tab")
+
+    local tsbAuto = tsbTab:CreateGroupbox({Name = "Automation", Column = 1})
+    tsbAuto:CreateToggle({Name = "Auto Skill Cycle", Callback = function(v) end}, "tsb_auto_skill")
 end
 
 --// SECTION : Interface Settings
-local settingsSection = win:CreateTabSection("INTERFACE")
-local settingsTab = settingsSection:CreateTab({
-    Name = "Settings", 
-    Columns = 2,
-    Icon = NebulaIcons:GetIcon("settings", "Lucide")
+local configSection = win:CreateTabSection("INTERFACE")
+local configTab = configSection:CreateTab({
+    Name = "Settings", Columns = 2, Icon = NebulaIcons:GetIcon("settings", "Lucide")
 }, "settings")
 
-settingsTab:BuildThemeGroupbox(1)
-settingsTab:BuildConfigGroupbox(2)
+configTab:BuildThemeGroupbox(1)
+configTab:BuildConfigGroupbox(2)
 
---// SECTION : Finalize
+--// Finalize
 Starlight:LoadAutoloadConfig()
 Starlight:LoadAutoloadTheme()
