@@ -58,7 +58,7 @@ local Movement = {
     TPWalk = false, TPSpeed = 50
 }
 
---// SECTION: Utility & Math Functions
+--// SECTION: Utility Functions
 local function GetClosestPlayer()
     local closestDist = Aimbot.FOV
     local closestTarget = nil
@@ -78,7 +78,6 @@ local function GetClosestPlayer()
     return closestTarget
 end
 
---// SECTION: Cached ESP Engine
 local function HideCache(cache)
     cache.Highlight.Adornee = nil
     cache.Box.Visible = false
@@ -88,8 +87,8 @@ local function HideCache(cache)
     cache.Text.Visible = false
 end
 
+--// SECTION: ESP Engine
 RunService.RenderStepped:Connect(function()
-    -- FOV Circle Logic
     if Aimbot.ShowFOV then
         FOVCircle.Visible = true
         FOVCircle.Radius = Aimbot.FOV
@@ -152,9 +151,15 @@ RunService.RenderStepped:Connect(function()
                         cache.Highlight.FillTransparency = 0.5
                         cache.Highlight.OutlineTransparency = 0
                         cache.Highlight.OutlineColor = Color3.new(1,1,1)
+                        
                     elseif Visuals.Type == "Box" then
-                        local headPos = Camera:WorldToViewportPoint(head.Position + Vector3.new(0, 0.5, 0))
-                        local legPos = Camera:WorldToViewportPoint(hrp.Position - Vector3.new(0, 3, 0))
+                        -- Math bypassed for executor compatibility
+                        local hOffset = Vector3.new(head.Position.X, head.Position.Y + 0.5, head.Position.Z)
+                        local lOffset = Vector3.new(hrp.Position.X, hrp.Position.Y - 3, hrp.Position.Z)
+                        
+                        local headPos = Camera:WorldToViewportPoint(hOffset)
+                        local legPos = Camera:WorldToViewportPoint(lOffset)
+                        
                         local height = math.abs(headPos.Y - legPos.Y)
                         local width = height / 2
 
@@ -174,6 +179,7 @@ RunService.RenderStepped:Connect(function()
                             cache.HealthBar.To = Vector2.new(cache.Box.Position.X - 5, cache.Box.Position.Y + height - (height * healthPerc))
                             cache.HealthBar.Color = Color3.new(1 - healthPerc, healthPerc, 0)
                         end
+                        
                     elseif Visuals.Type == "Skeleton" then
                         cache.Spine.Visible = true
                         local head2D = Camera:WorldToViewportPoint(head.Position)
@@ -233,9 +239,14 @@ local function aimbotKeyDown()
                 local dist = (Camera.CFrame.Position - position).Magnitude
                 local timeToHit = dist / Aimbot.BulletVelocity
                 local targetVel = Target.Character.HumanoidRootPart.AssemblyLinearVelocity
-                position = position + (targetVel * timeToHit)
                 local drop = 0.5 * Aimbot.BulletDrop * (timeToHit ^ 2)
-                position = position + Vector3.new(0, drop, 0)
+                
+                -- Math bypassed for executor compatibility
+                position = Vector3.new(
+                    position.X + (targetVel.X * timeToHit),
+                    position.Y + (targetVel.Y * timeToHit) + drop,
+                    position.Z + (targetVel.Z * timeToHit)
+                )
             end
 
             local newCFrame = CFrame.lookAt(Camera.CFrame.Position, position)
@@ -286,7 +297,10 @@ RunService.Heartbeat:Connect(function(dt)
     if Movement.JPEnabled then hum.UseJumpPower = true hum.JumpPower = Movement.JPValue end
 
     if Movement.TPWalk and hum.MoveDirection.Magnitude > 0 then
-        hrp.CFrame = hrp.CFrame + (hum.MoveDirection * Movement.TPSpeed * dt)
+        -- Math bypassed for executor compatibility
+        local offset = hum.MoveDirection * Movement.TPSpeed * dt
+        local newPos = Vector3.new(hrp.Position.X + offset.X, hrp.Position.Y + offset.Y, hrp.Position.Z + offset.Z)
+        hrp.CFrame = CFrame.new(newPos) * hrp.CFrame.Rotation
     end
 end)
 
@@ -307,7 +321,7 @@ win:CreateHomeTab({
     Changelog = {{ Title = "Release", Date = "Current", Description = "Universal & TSB Modules Active." }}
 })
 
---// SECTION: UNIVERSAL TABS (Always Active)
+--// SECTION: UNIVERSAL TABS
 local universalSection = win:CreateTabSection("UNIVERSAL")
 
 -- 1. COMBAT
